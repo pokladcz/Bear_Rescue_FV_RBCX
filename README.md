@@ -1,0 +1,2 @@
+- projekt, pro robota na soutez bear rescue do Prahy 2025
+- robot je zalozen na desce rbcx a esp32-p4 , kod pro esp32-p4 najdete na : https://github.com/ZemanNz/ESP32-P4_BEARRESCUE

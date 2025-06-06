@@ -1,0 +1,81 @@
+#include <Arduino.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
+#include "robotka.h"
+
+#define RX1_PIN   16
+#define TX1_PIN   17
+
+#define ESP32P4_SYNC0 0xAA
+#define ESP32P4_SYNC1 0x55
+
+typedef struct __attribute__((packed)) {
+    uint16_t x;
+    uint16_t y;
+    bool camera;
+    bool on;
+    int16_t angle; // Přidáno pole pro úhel
+} Esp32p4Message;
+
+enum RxState { WAIT_SYNC0, WAIT_SYNC1, READ_PAYLOAD, READ_CHECKSUM };
+RxState state = WAIT_SYNC0;
+
+static const size_t PAYLOAD_SIZE = sizeof(Esp32p4Message);
+uint8_t buf[PAYLOAD_SIZE];
+size_t idx = 0;
+uint8_t checksum = 0;
+
+void setup() {
+    rkConfig cfg;
+    rkSetup(cfg);
+
+    rkLedRed(true);
+    rkLedBlue(true);
+    printf("RBCX UART RX started!\n");
+    Serial1.begin(115200, SERIAL_8N1, RX1_PIN, TX1_PIN);
+}
+
+void loop() {
+    while (Serial1.available()) {
+        uint8_t c = Serial1.read();
+        switch (state) {
+            case WAIT_SYNC0:
+                if (c == ESP32P4_SYNC0) state = WAIT_SYNC1;
+                break;
+            case WAIT_SYNC1:
+                if (c == ESP32P4_SYNC1) {
+                    state = READ_PAYLOAD;
+                    idx = 0;
+                    checksum = 0;
+                } else {
+                    state = (c == ESP32P4_SYNC0) ? WAIT_SYNC1 : WAIT_SYNC0;
+                }
+                break;
+            case READ_PAYLOAD:
+                buf[idx++] = c;
+                checksum += c;
+                if (idx >= PAYLOAD_SIZE) {
+                    state = READ_CHECKSUM;
+                }
+                break;
+            case READ_CHECKSUM:
+                if (c == checksum) {
+                    Esp32p4Message m;
+                    memcpy(&m, buf, PAYLOAD_SIZE);
+                    printf("Received: x=%u, y=%u, camera=%u, on=%u, angle=%d\n", m.x, m.y, m.camera, m.on, m.angle);
+                    // zde můžeš volat další logiku, např. ovládání robota podle m
+                    if (m.on) {
+                        rkLedGreen(true);
+                    } else {
+                        rkLedGreen(false);
+                    }
+                    // např. pokud m.camera, můžeš něco spustit
+                } else {
+                    printf("Checksum error! (got 0x%02X, expected 0x%02X)\n", c, checksum);
+                }
+                state = WAIT_SYNC0;
+                break;
+        }
+    }
+}
