@@ -112,22 +112,29 @@ void projeti_bludiste_tam(){
     Serial.println("projeti bludiště tam");
     // Příkaz pro projetí bludiště
     auto & g_bus = rkSmartServoBus(2);
-    small_forward(595, 95); // Předpokládáme, že tato funkce je definována v motor_commands.h
-    radius_r(183, 130, 95);
+    //small_forward(595, 95); // Předpokládáme, že tato funkce je definována v motor_commands.h
+    fast_forward(600, 95); // Předpokládáme, že tato funkce je definována v motor_commands.h
+    fast_radius_r(174, 130, 95);
     //small_forward(140, 95);
-    radius_l(178, 210, 95); 
-    //back_buttons(80);
+    fast_radius_l(170, 210, 95);
     klepeta_open(g_bus);
-    forward(810, 95);
+    fast_forward(810, 95);
     Serial.println("projeti bludiště hotova");
 }
 void jed_pro_medu(){
     ///////////////// hledani podle uhlu
-    radius_l((int)msg.angle, 0, 20); // otočíme se na správný směr
+    Serial.println("Hledání medvěda podle úhlu a vzdálenosti");
+    fast_radius_l((int)msg.angle, 0, 20); // otočíme se na správný směr
+    rkMotorsSetPower(0, 0); // Nastavíme motory na plný výkon
+    Serial.printf("Otočení na úhel: %d\n", msg.angle);
     auto & g_bus = rkSmartServoBus(2);
+    Serial.printf("Hledám medvěda na úhlu: %d\n", msg.angle);
     if((msg.angle > 80)){
-        forward(200, 70); // Předpokládáme, že tato funkce je definována v motor_commands.h
+        Serial.println("Medvěd je nalevo, otáčíme se doleva");
+        small_forward(200, 70); // Předpokládáme, že tato funkce je definována v motor_commands.h
+        Serial.println("Medvěd je .......");
     }
+    Serial.printf("Hledám medvěda na vzdálenosti: %d\n", msg.distance);
     if((msg.angle > 10)){
         klepeta_open_max(g_bus);
     }
@@ -139,7 +146,7 @@ void jed_pro_medu(){
     }
     else{
         
-        forward(msg.distance - 100 , 80);
+        small_forward(msg.distance - 100 , 80);
     }
     if(mam_ho()){
         rkBuzzerSet(true);
@@ -157,34 +164,34 @@ void jed_pro_medu(){
     printf("ANGLE: %d\n", msg.angle);
     ///////////////// aby se dokazal dotocit!!!
     if(msg.angle < 10){
-        radius_l(-30, 180, 80); // otočíme se na správný směr
+        fast_radius_l(-30, 180, 80); // otočíme se na správný směr
         delay(100);
-        radius_r(-30, 180, 80); // otočíme se na správný směr
+        fast_radius_r(-30, 180, 80); // otočíme se na správný směr
     }
     else if(msg.angle > 80){
-        radius_r(-30, 180, 80); // otočíme se na správný směr
+        fast_radius_r(-30, 180, 80); // otočíme se na správný směr
         delay(100);
-        radius_l(-30, 180, 80); // otočíme se na správný směr
+        fast_radius_l(-30, 180, 80); // otočíme se na správný směr
     }
     turn_on_spot(-(95-msg.angle)); // otočíme se zpět 95, protoze se otoci malo
     delay(100);
     back_buttons(100); // vrátíme se zpět
-    forward(80, 80); // a jedeme zpět
+    fast_forward(80, 80); // a jedeme zpět
     turn_on_spot(90);
     back_buttons(100); // vrátíme se zpět
     /////////////
 }
 void navrat_domu(){
     auto & g_bus = rkSmartServoBus(2);
-    radius_l(90, 0, 90); // otočíme se na správný směr
+    fast_radius_l(90, 0, 90); // otočíme se na správný směr
     back_buttons(90); // vrátíme se zpět
-    small_forward(160, 90); // a jedeme zpět
-    radius_r(90, 350, 90); // otočíme se zpět
-    small_forward(200, 90); // a jedeme zpět
-    radius_l(180, 110, 90); // otočíme se zpět
-    small_forward(550, 90); // a jedeme zpět
+    fast_forward(160, 90); // a jedeme zpět
+    fast_radius_r(90, 350, 90); // otočíme se zpět
+    fast_forward(200, 90); // a jedeme zpět
+    fast_radius_l(180, 110, 90); // otočíme se zpět
+    fast_forward(550, 90); // a jedeme zpět
     klepeta_open(g_bus);
-    rkMotorsSetPower(10000, -10000);
+    rkMotorsSetPower(30000, 30000);
 }
 void send_esp_ready(bool ready) {
     uint8_t tx_buf[4];

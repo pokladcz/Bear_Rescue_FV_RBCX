@@ -216,6 +216,65 @@ void forward(float mm, float speed) {
 
     // Serial.println("[FORWARD] Hotovo!");
 }
+
+void fast_forward(float mm, float speed) {
+    int M1_pos = 0, M4_pos = 0, odchylka = 0, integral = 0, last_odchylka = 0;
+    int M1_pos_start = 0, M4_pos_start = 0;
+    int target = (32000 * speed / 100);
+
+    auto& man = rb::Manager::get();
+    man.motor(rb::MotorId::M1).setCurrentPosition(0);
+    man.motor(rb::MotorId::M4).setCurrentPosition(0);
+
+    man.motor(rb::MotorId::M1).requestInfo([&](rb::Motor& info) {
+        M1_pos_start = -info.position();
+    });
+    man.motor(rb::MotorId::M4).requestInfo([&](rb::Motor& info) {
+        M4_pos_start = info.position();
+    });
+    delay(20);
+
+    int M1_must_go = ((mm / (127.5 * 3.141592)) * 40.4124852f * 48.f) + M1_pos_start;
+    int M4_must_go = ((mm / (127.5 * 3.141592)) * 40.4124852f * 48.f) + M4_pos_start;
+
+    // Zrychlování + jízda bez zpomalování
+    bool done = false;
+    int i = 0;
+    while (!done) {
+        odchylka = M1_pos - M4_pos;
+        integral += odchylka;
+        if (i < target) i += a;
+        if (i > target) i = target;
+
+        int powerM1 = -i * 0.95;
+        int powerM4 = i + odchylka * Kp + integral * Ki + (odchylka - last_odchylka) * Kd;
+
+        // saturace
+        const int maxPower = 32000;
+        if (powerM4 > maxPower) powerM4 = maxPower;
+        if (powerM4 < -maxPower) powerM4 = -maxPower;
+
+        man.motor(rb::MotorId::M1).power(powerM1);
+        man.motor(rb::MotorId::M4).power(powerM4);
+
+        man.motor(rb::MotorId::M1).requestInfo([&](rb::Motor& info) {
+            M1_pos = -info.position();
+        });
+        man.motor(rb::MotorId::M4).requestInfo([&](rb::Motor& info) {
+            M4_pos = info.position();
+        });
+
+        last_odchylka = odchylka;
+
+        // Konec když oba motory dojedou
+        if (M1_pos >= M1_must_go && M4_pos >= M4_must_go) done = true;
+
+        delay(2);
+    }
+    man.motor(rb::MotorId::M1).power(0);
+    man.motor(rb::MotorId::M4).power(0);
+}
+
 void encodery() {
   // Serial.printf("L: %f, R: %f\n", rkMotorsGetPositionLeft(), rkMotorsGetPositionRight());
 }
@@ -275,6 +334,118 @@ void radius_l(int degrees, int polomer, int speed){
         delay(10); // čekáme na dokončení obou motorů
     }
 }
+void fast_radius_r(int degrees, int polomer, int speed) {
+    auto& man = rb::Manager::get();
+    man.motor(rb::MotorId::M1).setCurrentPosition(0);
+    man.motor(rb::MotorId::M4).setCurrentPosition(0);
+    float sR = speed * ((polomer) / (polomer + roztec));
+    float sL = speed;
+    int M1_pos = 0, M4_pos = 0;
+    float distance_right = 0, distance_left = 0;
+    if(degrees > 0){
+        float stupne = degrees * koeficient_l_f;
+        man.motor(rb::MotorId::M1).power(-sR * 320);
+        man.motor(rb::MotorId::M4).power(sL * 320);
+        distance_right = ((polomer * PI * stupne) / 180.0f) * 40.4124852f * 48.f / (127.5f * PI);
+        distance_left = (((polomer + roztec) * PI * stupne) / 180.0f) * 40.4124852f * 48.f / (127.5f * PI);
+        man.motor(rb::MotorId::M1).requestInfo([&](rb::Motor& info) {
+            M1_pos = -info.position();
+        });
+        man.motor(rb::MotorId::M4).requestInfo([&](rb::Motor& info) {
+                M4_pos = info.position();
+            });
+        while(M1_pos < distance_right || M4_pos < distance_left) {
+            man.motor(rb::MotorId::M1).requestInfo([&](rb::Motor& info) {
+                M1_pos = -info.position();
+            });
+            man.motor(rb::MotorId::M4).requestInfo([&](rb::Motor& info) {
+                M4_pos = info.position();
+            });
+            delay(2); // čekáme na dokončení obou motorů
+        }
+    }
+    else{
+        float stupne = degrees * koeficient_l_b;
+        man.motor(rb::MotorId::M1).power(sR * 320);
+        man.motor(rb::MotorId::M4).power(-sL * 320);
+        distance_right = ((polomer * PI * stupne) / 180.0f) * 40.4124852f * 48.f / (127.5f * PI);
+        distance_left = (((polomer + roztec) * PI * stupne) / 180.0f) * 40.4124852f * 48.f / (127.5f * PI);
+        man.motor(rb::MotorId::M1).requestInfo([&](rb::Motor& info) {
+            M1_pos = info.position();
+        });
+        man.motor(rb::MotorId::M4).requestInfo([&](rb::Motor& info) {
+            M4_pos = -info.position();
+        });
+        while(M1_pos < distance_right || M4_pos < distance_left) { 
+            man.motor(rb::MotorId::M1).requestInfo([&](rb::Motor& info) {
+                M1_pos = info.position();
+            });
+            man.motor(rb::MotorId::M4).requestInfo([&](rb::Motor& info) {
+                M4_pos = -info.position();
+            });
+            delay(2); // čekáme na dokončení obou motorů
+        }
+    }
+    
+
+    // NEVYPÍNÁME! motory dál jedou v poměru -sL : +sR
+}
+void fast_radius_l(int degrees, int polomer, int speed) {
+    auto& man = rb::Manager::get();
+    man.motor(rb::MotorId::M1).setCurrentPosition(0);
+    man.motor(rb::MotorId::M4).setCurrentPosition(0);
+    float sR = speed ;
+    float sL = speed * ((polomer) / (polomer + roztec));
+    int M1_pos = 0, M4_pos = 0;
+    float distance_right = 0, distance_left = 0;
+    if(degrees > 0){
+        float stupne = degrees * koeficient_l_f;
+        man.motor(rb::MotorId::M1).power(-sR * 320);
+        man.motor(rb::MotorId::M4).power(sL * 320);
+        distance_left = ((polomer * PI * stupne) / 180.0f) * 40.4124852f * 48.f / (127.5f * PI);
+        distance_right = (((polomer + roztec) * PI * stupne) / 180.0f) * 40.4124852f * 48.f / (127.5f * PI);
+        man.motor(rb::MotorId::M1).requestInfo([&](rb::Motor& info) {
+            M1_pos = -info.position();
+        });
+        man.motor(rb::MotorId::M4).requestInfo([&](rb::Motor& info) {
+                M4_pos = info.position();
+            });
+        while(M1_pos < distance_right || M4_pos < distance_left) {
+            man.motor(rb::MotorId::M1).requestInfo([&](rb::Motor& info) {
+                M1_pos = -info.position();
+            });
+            man.motor(rb::MotorId::M4).requestInfo([&](rb::Motor& info) {
+                M4_pos = info.position();
+            });
+            delay(2); // čekáme na dokončení obou motorů
+        }
+    }
+    else{
+        float stupne = degrees * koeficient_l_b;
+        man.motor(rb::MotorId::M1).power(sR * 320);
+        man.motor(rb::MotorId::M4).power(-sL * 320);
+        distance_left = ((polomer * PI * stupne) / 180.0f) * 40.4124852f * 48.f / (127.5f * PI);
+        distance_right = (((polomer + roztec) * PI * stupne) / 180.0f) * 40.4124852f * 48.f / (127.5f * PI);
+        man.motor(rb::MotorId::M1).requestInfo([&](rb::Motor& info) {
+            M1_pos = info.position();
+        });
+        man.motor(rb::MotorId::M4).requestInfo([&](rb::Motor& info) {
+            M4_pos = -info.position();
+        });
+        while(M1_pos < distance_right || M4_pos < distance_left) { 
+            man.motor(rb::MotorId::M1).requestInfo([&](rb::Motor& info) {
+                M1_pos = info.position();
+            });
+            man.motor(rb::MotorId::M4).requestInfo([&](rb::Motor& info) {
+                M4_pos = -info.position();
+            });
+            delay(2); // čekáme na dokončení obou motorů
+        }
+    }
+    
+
+    // NEVYPÍNÁME! motory dál jedou v poměru -sL : +sR
+}
 void turn_on_spot(int degrees){
   rkMotorsDrive(((degrees/360.0) * PI * roztec) * koeficient_turn , ((degrees/360.0) * -PI * roztec)* koeficient_turn, 30 , 30 );
     // Serial.printf("Otáčení na místě o %d stupňů\n", degrees);
@@ -302,7 +473,7 @@ void back_buttons(int speed)
         });
         man.motor(rb::MotorId::M1).power(i * 0.94);
         man.motor(rb::MotorId::M4).power(-i + odchylka * Kp + integral * Ki + (odchylka - last_odchylka) * Kd);
-        // Serial.printf("[ACCEL] i: %d | M1_pos: %d | M4_pos: %d | odchylka: %d | integral: %d\n", i, M1_pos, M4_pos, odchylka, integral);
+        // Serial.printf("[ACCEL] i: %d | M1_pos: %d | M4_pos: %d | odchylka: %d | integral: %d\n", i, M1_pos, M4_pos, odhylka, integral);
         delay(8);
     }
     int time = 0;
@@ -333,7 +504,7 @@ void back_buttons(int speed)
         delay(50);
         time+=50;
     }
-    delay(150);
+    delay(50);
     // Serial.println("Obě Tlačítka STISKNUTY!");
     rkMotorsSetPower(0, 0);
 }
