@@ -41,8 +41,12 @@ Esp32p4Message msg = {
 };
 bool mam_ho(){
     int distance = rkUltraMeasure(4);
+    if (distance < 1) {
+        Serial.println("Chyba při měření vzdálenosti!");
+        return false; // Vrátí false, pokud došlo k chybě
+    }
     Serial.printf("ultrazvuk: %d\n", distance); // Vypíše hodnotu distance
-    if(distance > 60 && distance < 800){
+    if(distance > 70 && distance < 800){
         return false; // pokud je medvěd blízko, vrátí true
     }
     else{
@@ -108,10 +112,10 @@ void projeti_bludiste_tam(){
     Serial.println("projeti bludiště tam");
     // Příkaz pro projetí bludiště
     auto & g_bus = rkSmartServoBus(2);
-    small_forward(595, 70); // Předpokládáme, že tato funkce je definována v motor_commands.h
-    radius_r(183, 130, 75);
+    small_forward(595, 95); // Předpokládáme, že tato funkce je definována v motor_commands.h
+    radius_r(183, 130, 95);
     //small_forward(140, 95);
-    radius_l(178, 215, 75); 
+    radius_l(178, 210, 95); 
     //back_buttons(80);
     klepeta_open(g_bus);
     forward(810, 95);
@@ -119,50 +123,68 @@ void projeti_bludiste_tam(){
 }
 void jed_pro_medu(){
     ///////////////// hledani podle uhlu
-    delay(3000);
-    radius_l((int)msg.angle, 0, 50); // otočíme se na správný směr
+    radius_l((int)msg.angle, 0, 20); // otočíme se na správný směr
     auto & g_bus = rkSmartServoBus(2);
-    klepeta_open_max(g_bus);
+    if((msg.angle > 80)){
+        forward(200, 70); // Předpokládáme, že tato funkce je definována v motor_commands.h
+    }
+    if((msg.angle > 10)){
+        klepeta_open_max(g_bus);
+    }
     if(msg.distance >= (msg.max_distance - 430)){
-        forward(msg.distance - 400 , 70);
+        forward(msg.distance - 400 , 80);
         klepeta_open(g_bus);
         delay(300);
-        small_forward(200, 70); // Předpokládáme, že tato funkce je definována v motor_commands.h
+        small_forward(200, 80); // Předpokládáme, že tato funkce je definována v motor_commands.h
     }
     else{
         
-        forward(msg.distance - 100 , 70);
+        forward(msg.distance - 100 , 80);
     }
     if(mam_ho()){
         rkBuzzerSet(true);
-        delay(500);
+        delay(1);
         rkBuzzerSet(false);
         Serial.println("Medvěd byl nalezen!");
     }
     else{
         Serial.println("Medvěd nebyl nalezen!");
+        //sem dat dojeti spet na hledaci npozici a zapnout kameru...
     }
-    delay(200);
+    delay(100);
     klepeta_close(g_bus);
-    delay(1000);
+    delay(800);
+    printf("ANGLE: %d\n", msg.angle);
+    ///////////////// aby se dokazal dotocit!!!
+    if(msg.angle < 10){
+        radius_l(-30, 180, 80); // otočíme se na správný směr
+        delay(100);
+        radius_r(-30, 180, 80); // otočíme se na správný směr
+    }
+    else if(msg.angle > 80){
+        radius_r(-30, 180, 80); // otočíme se na správný směr
+        delay(100);
+        radius_l(-30, 180, 80); // otočíme se na správný směr
+    }
     turn_on_spot(-(95-msg.angle)); // otočíme se zpět 95, protoze se otoci malo
-    delay(300);
-    back_buttons(80); // vrátíme se zpět
-    forward(60, 60); // a jedeme zpět
+    delay(100);
+    back_buttons(100); // vrátíme se zpět
+    forward(80, 80); // a jedeme zpět
     turn_on_spot(90);
-    back_buttons(95); // vrátíme se zpět
+    back_buttons(100); // vrátíme se zpět
     /////////////
 }
 void navrat_domu(){
     auto & g_bus = rkSmartServoBus(2);
     radius_l(90, 0, 90); // otočíme se na správný směr
-    back_buttons(50); // vrátíme se zpět
-    small_forward(160, 70); // a jedeme zpět
+    back_buttons(90); // vrátíme se zpět
+    small_forward(160, 90); // a jedeme zpět
     radius_r(90, 350, 90); // otočíme se zpět
     small_forward(200, 90); // a jedeme zpět
     radius_l(180, 110, 90); // otočíme se zpět
     small_forward(550, 90); // a jedeme zpět
     klepeta_open(g_bus);
+    rkMotorsSetPower(10000, -10000);
 }
 void send_esp_ready(bool ready) {
     uint8_t tx_buf[4];
@@ -196,6 +218,8 @@ void setup() {
         projeti_bludiste_tam();
         jed_pro_medu();
         navrat_domu();
+        msg.x = 0; // Reset x and y after processing
+        msg.y = 0; // Reset x and y after processing
     }
     if(msg.camera){
         Serial.println("Camera mode activated");

@@ -190,18 +190,18 @@ void forward(float mm, float speed) {
         man.motor(rb::MotorId::M4).requestInfo([&](rb::Motor& info) {
             M4_pos = info.position();
         });
-        if(i < 5000){
-          while(M1_pos < ( M1_must_go - (speed/50.0 * 15))){
-            delay(10);
-            man.motor(rb::MotorId::M1).requestInfo([&](rb::Motor& info) {
-              M1_pos = -info.position();
-            });
-            man.motor(rb::MotorId::M4).requestInfo([&](rb::Motor& info) {
-              M4_pos = info.position();
-            });
-            // Serial.printf("[finishing] M1_pos: %d | M4_pos: %d | odchylka: %d | integral: %d\n", M1_pos, M4_pos, odhylaka, integral);
-          }
-        }
+        // if(i < 5000){
+        //   while(M1_pos < ( M1_must_go - (speed/50.0 * 15))){
+        //     delay(10);
+        //     man.motor(rb::MotorId::M1).requestInfo([&](rb::Motor& info) {
+        //       M1_pos = -info.position();
+        //     });
+        //     man.motor(rb::MotorId::M4).requestInfo([&](rb::Motor& info) {
+        //       M4_pos = info.position();
+        //     });
+        //     // Serial.printf("[finishing] M1_pos: %d | M4_pos: %d | odchylka: %d | integral: %d\n", M1_pos, M4_pos, odhylaka, integral);
+        //   }
+        // }
         man.motor(rb::MotorId::M1).power(-i);
         man.motor(rb::MotorId::M4).power(i );
 
